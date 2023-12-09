@@ -1,0 +1,53 @@
+cmake_minimum_required(VERSION 3.12)
+project(cc_project)
+
+if(UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+if (LINUX)
+    message("[  OS  ] Building project on linux, additional flags are enabled")
+    set(CMAKE_CXX_FLAGS "-Wall -Wreturn-type -Wno-unknown-pragmas")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -rdynamic -DYYDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+else()
+    message("[  OS  ] Building project not on linux, no additional flags")
+    set(CMAKE_CXX_FLAGS "-Wall -Wno-unknown-pragmas")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -DYYDEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+endif()
+
+# Bison package with bison target
+find_package(BISON REQUIRED)
+BISON_TARGET(Parser ${CMAKE_CURRENT_SOURCE_DIR}/parser.ypp ${CMAKE_CURRENT_BINARY_DIR}/../src/Parser.tab.cpp)
+# Flex package with flex target
+find_package(FLEX REQUIRED)
+FLEX_TARGET(Lexer ${CMAKE_CURRENT_SOURCE_DIR}/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/../src/lexer.cpp)
+
+set(LLVM_DIR_FROM_ENV $ENV{LLVM_DIR})
+if ("<var>${LLVM_DIR_FROM_ENV}" STREQUAL "<var>")
+    message("[ LLVM ] LLVM_DIR directory will be found using system configuration")
+else()
+    set(LLVM_DIR ${LLVM_DIR_FROM_ENV})
+    message("[ LLVM ] LLVM_DIR set to ${LLVM_DIR}")
+endif()
+
+add_compile_definitions(__BUILD_TYPE_RELEASE)
+add_compile_definitions(__COMPILER_FLAG_O2)
+
+find_package(LLVM REQUIRED CONFIG)
+message("[ LLVM ] Found LLVM ${LLVM_PACKAGE_VERSION}")
+message("[ LLVM ] Using LLVMConfig.cmake in: ${LLVM_DIR}")
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+llvm_map_components_to_libnames(LLVM_LIBS support core irreader bitwriter)
+
+set(EXE_NAME cxx_compiler)
+file(GLOB_RECURSE SOURCE_FILES_LIST "src/**.cpp")
+add_executable(${EXE_NAME} ${SOURCE_FILES_LIST})
+target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(${EXE_NAME} stdc++ ${LLVM_LIBS})
+target_sources(${EXE_NAME} PRIVATE ${BISON_Parser_OUTPUTS})
+target_sources(${EXE_NAME} PRIVATE ${FLEX_Lexer_OUTPUTS})
